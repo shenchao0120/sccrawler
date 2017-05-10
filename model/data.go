@@ -70,7 +70,7 @@ type ItemData struct {
 	PipeErrs []error
 }
 
-func (itemData * ItemData)Vaild() bool {
+func (itemData * ItemData)Valid() bool {
 	return itemData.url!=nil && itemData.rawData!=nil
 }
 
@@ -91,6 +91,13 @@ func (itemData * ItemData)RawData() []byte{
 }
 
 
+
+type Items map[string]ItemData
+
+
+func (items Items)Valid() bool{
+	return items!=nil
+}
 
 
 
