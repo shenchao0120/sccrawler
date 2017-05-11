@@ -62,6 +62,7 @@ func (rep *Response)Valid() bool{
 //
 
 type ItemData struct {
+	id  uint32
 	url *url.URL
 	depth uint32
 	timestamp []byte
@@ -90,9 +91,13 @@ func (itemData * ItemData)RawData() []byte{
 	return itemData.rawData
 }
 
+func (itemData * ItemData)ID() uint32{
+	return itemData.id
+}
 
 
-type Items map[string]ItemData
+
+type Items map[string]*ItemData
 
 
 func (items Items)Valid() bool{
