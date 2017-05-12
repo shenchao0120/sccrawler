@@ -19,7 +19,18 @@ func genDownloaderID()uint32{
 
 type PageDownloader interface {
 	Id() uint32
-	Download(request model.Request)(model.Response,error)
+	Download(request model.Request)(* model.Response,error)
+}
+
+func NewPageDownloader(client *http.Client) PageDownloader {
+	id := genDownloaderID()
+	if client == nil {
+		client = &http.Client{}
+	}
+	return &pageDownloaderImp{
+		id:         id,
+		httpClient: *client,
+	}
 }
 
 
