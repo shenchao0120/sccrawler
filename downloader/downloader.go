@@ -1,0 +1,47 @@
+package downloader
+
+import (
+	mdw "chaoshen.com/sccrawler/middleware"
+	"github.com/op/go-logging"
+	"chaoshen.com/sccrawler/model"
+	"net/http"
+	"errors"
+)
+
+var logger= logging.MustGetLogger("Downloader")
+
+
+var idGenerator mdw.IdGenerator=mdw.NewIdGenerator()
+
+func genDownloaderID()uint32{
+	return idGenerator.GetUint32()
+}
+
+type PageDownloader interface {
+	Id() uint32
+	Download(request model.Request)(model.Response,error)
+}
+
+
+type pageDownloaderImp struct {
+	id uint32
+	httpClient http.Client
+}
+
+func (pdi *pageDownloaderImp)Id() uint32{
+	return pdi.id
+}
+
+func (pdi *pageDownloaderImp)Download(request model.Request)(*model.Response,error){
+	if request.Valid()==false {
+		return nil,errors.New("Invaild Request!")
+	}
+	logger.Debugf("Begin http request with url:%s\n",request.HttpReq().URL.String())
+	if httpRep,err:=pdi.httpClient.Do(request.HttpReq());err!=nil{
+		return nil,err
+	} else {
+		return model.NewResponse(httpRep,request.Depth()),nil
+	}
+}
+
+
