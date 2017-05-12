@@ -5,6 +5,7 @@ import (
 	mdw "chaoshen.com/sccrawler/middleware"
 	"chaoshen.com/sccrawler/model"
 	"errors"
+	"fmt"
 )
 
 var logger= logging.MustGetLogger("analyzer")
@@ -43,4 +44,49 @@ func (ali *analyzerImp)Analyzer(resp model.Response,parsers []ParseResponse)([]m
 	itemList:=make([]model.ItemData,0)
 	errorList:=make([]error,0)
 
+	for i,parser:= range parsers {
+		if parser==nil{
+			errMsg:=fmt.Sprintf("The [%d]th parser is nil!",i)
+			appendErrorList(errorList,[]error{errors.New(errMsg)})
+		}
+		reqRes,itemRes,errRes:=parser(resp)
+		requestList=appendRequestList(requestList,reqRes)
+		itemList=appendItemList(itemList,itemRes)
+		errorList=appendErrorList(errorList,errRes)
+	}
+	return  requestList,itemList,errorList
 }
+
+func appendErrorList(errorList []error,errList2 []error) []error{
+	for _,err:= range errList2{
+		if err==nil{
+			continue
+		}
+		errorList=append(errorList,err)
+	}
+	return errorList
+}
+
+func appendRequestList(resultList[]model.Request,partList []model.Request) []model.Request{
+	for i,elem:=range partList{
+		if !elem.Valid(){
+			logger.Debugf("Invaild element %d",i)
+			continue
+		}
+		resultList=append(resultList,elem)
+	}
+	return resultList
+}
+
+
+func appendItemList(resultList[]model.ItemData,partList []model.ItemData) []model.ItemData{
+	for i,elem:=range partList{
+		if !elem.Valid(){
+			logger.Debugf("Invaild element %d",i)
+			continue
+		}
+		resultList=append(resultList,elem)
+	}
+	return resultList
+}
+
