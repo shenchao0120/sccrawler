@@ -3,6 +3,8 @@ package model
 import (
 	"net/http"
 	"net/url"
+	"chaoshen.com/sccrawler/middleware"
+	"time"
 )
 
 //基础数据接口
@@ -59,56 +61,75 @@ func (rep *Response)Valid() bool{
 	return  rep.httpRep!=nil && rep.httpRep.Body!=nil
 }
 
-//
+// Item parsed from page
 
-type ItemData struct {
+type Item struct {
 	id  uint32
 	url *url.URL
 	depth uint32
 	timestamp []byte
+	dataMap ItemData
 	rawData []byte
 	ProcData []byte
 	PipeErrs []error
 }
 
-func (itemData * ItemData)Valid() bool {
-	return itemData.url!=nil && itemData.rawData!=nil
+func NewItem(req Response ) *Item {
+	id :=genItemID()
+	timestamp:=([]byte)time.Now().String()
+	dataMap:=make(ItemData)
+	return &Item{id:id,
+		url:req.httpRep.Request.URL,
+		depth:req.depth,
+		timestamp:timestamp,
+		dataMap:dataMap,
+	}
 }
 
-func (itemData * ItemData)URL() *url.URL{
-	return itemData.url
+func (item * Item)Valid() bool {
+	return item.url!=nil && item.rawData!=nil
 }
 
-func (itemData * ItemData)Depth() uint32{
-	return itemData.depth
+func (item * Item)URL() *url.URL{
+	return item.url
 }
 
-func (itemData * ItemData)Timestamp() []byte{
-	return itemData.timestamp
+func (item * Item)Depth() uint32{
+	return item.depth
 }
 
-func (itemData * ItemData)RawData() []byte{
-	return itemData.rawData
+func (item * Item)Timestamp() []byte{
+	return item.timestamp
 }
 
-func (itemData * ItemData)ID() uint32{
-	return itemData.id
+func (item * Item)RawData() []byte{
+	return item.rawData
 }
 
-
-
-type Items map[string]*ItemData
-
-
-func (items Items)Valid() bool{
-	return items!=nil
+func (item * Item)Id() uint32{
+	return item.id
 }
 
+func (item * Item)AddDataMap(key string ,value interface{})bool{
+	if key=="" || value ==nil{
+		return false
+	}
+	if item.dataMap==nil{
+		item.dataMap=make(ItemData)
+	}
+	item.dataMap[key]=value
+	return true
+}
+
+func (item * Item)DataMap() ItemData{
+	return item.dataMap
+}
+
+type ItemData map[string]interface{}
 
 
+var idGenerator middleware.IdGenerator=middleware.NewIdGenerator()
 
-
-
-
-
-
+func genItemID()uint32{
+	return idGenerator.GetUint32()
+}
