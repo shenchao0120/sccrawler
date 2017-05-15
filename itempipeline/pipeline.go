@@ -89,3 +89,18 @@ func (ipl *ItemPipelineImp) Summary() string {
 		counts[0], counts[1], counts[2], ipl.ProcessingNum())
 	return summary
 }
+
+// 创建条目处理管道。
+func NewItemPipeline(itemProcessors []ItemProcessor) ItemPipeline {
+	if itemProcessors == nil {
+		panic(errors.New(fmt.Sprintln("Invalid item processor list!")))
+	}
+	innerItemProcessors := make([]ItemProcessor, 0)
+	for i, ip := range itemProcessors {
+		if ip == nil {
+			panic(errors.New(fmt.Sprintf("Invalid item processor[%d]!\n", i)))
+		}
+		innerItemProcessors = append(innerItemProcessors, ip)
+	}
+	return &ItemPipelineImp{processors: innerItemProcessors}
+}

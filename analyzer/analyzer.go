@@ -12,18 +12,23 @@ var logger= logging.MustGetLogger("analyzer")
 
 var idGenerator mdw.IdGenerator=mdw.NewIdGenerator()
 
-func genDownloaderID()uint32{
+func genAnalyzerId()uint32{
 	return idGenerator.GetUint32()
 }
 
 
 type Analyzer interface {
 	Id() uint32
-	Analyzer(resp model.Response,parsers []ParseResponse)([]model.Request,model.Item,[]error)
+	Analyzer(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error)
 }
 
 type analyzerImp struct {
 	id uint32
+}
+
+
+func NewAnalyzer() Analyzer {
+	return &analyzerImp{id: genAnalyzerId()}
 }
 
 func (ali *analyzerImp)Id()uint32{
