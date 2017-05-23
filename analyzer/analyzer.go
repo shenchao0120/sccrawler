@@ -19,7 +19,7 @@ func genAnalyzerId()uint32{
 
 type Analyzer interface {
 	Id() uint32
-	Analyzer(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error)
+	Analyze(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error)
 }
 
 type analyzerImp struct {
@@ -35,7 +35,7 @@ func (ali *analyzerImp)Id()uint32{
 	return ali.id
 }
 
-func (ali *analyzerImp)Analyzer(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error){
+func (ali *analyzerImp)Analyze(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error){
 	if resp.Valid()==false{
 		err:=errors.New("Response invalid!")
 		return nil,nil,[]error{err}

@@ -8,13 +8,10 @@ import (
 	 ipl "chaoshen.com/sccrawler/itempipeline"
 	mid "chaoshen.com/sccrawler/middleware"
 	"chaoshen.com/sccrawler/downloader"
-	"math"
 	"fmt"
 	"errors"
 	"sync/atomic"
-	"github.com/goc2p/src/webcrawler/base"
 	"time"
-	"go/token"
 )
 
 const (
@@ -166,6 +163,41 @@ func (sche *SchedulerImp)Start (
 	return nil
 }
 
+func (sche *SchedulerImp)Stop()bool{
+	if atomic.LoadUint32(&sche.running)!=1{
+		return false
+	}
+	sche.chanman.Close()
+	sche.stopSign.Sign()
+	sche.reqCache.close()
+
+	atomic.StoreUint32(&sche.running,1)
+	return true
+}
+
+func (sche* SchedulerImp) Running()bool{
+	return atomic.LoadUint32(&sche.running)==1
+}
+
+func (sche* SchedulerImp)ErrorChan() <-chan error {
+	if sche.chanman.Status()!=mid.CHANNEL_MANAGER_STATUS_INITIALIZED{
+		return nil
+	}
+	if errChan,err:=sche.chanman.GetErrorChan();err!=nil{
+		panic(err)
+	}else{
+		return errChan
+	}
+}
+
+func (sche *SchedulerImp) Idle() bool {
+	idleDlPool:=sche.dlPool.Used()==0
+	idleAlPool:=sche.alPool.Used()==0
+	idleItemPipeLine:=sche.itemPipe.ProcessingNum()==0
+
+	return idleDlPool && idleAlPool && idleItemPipeLine
+}
+
 
 func (sche  *SchedulerImp)startDownloading(){
 	go func(){
@@ -244,3 +276,73 @@ func (sche *SchedulerImp) getReqChan() chan model.Request {
 	}
 	return respChan
 }
+
+// 发送错误。
+func (sche *SchedulerImp) sendError(err error, code string) bool {
+	if err == nil {
+		return false
+	}
+	codePrefix := parseCode(code)[0]
+	var errorType model.ErrorType
+	switch codePrefix {
+	case DOWNLOADER_CODE:
+		errorType = model.DOWNLOADER_ERROR
+	case ANALYZER_CODE:
+		errorType = model.ANALYZER_ERROR
+	case ITEMPIPELINE_CODE:
+		errorType = model.ITEMS_PROCESSOR_ERROR
+	}
+	cError := model.NewCrawlerError(errorType, err.Error())
+	if sche.stopSign.IsSigned() {
+		sche.stopSign.Dealt(code)
+		return false
+	}
+	go func() {
+		sche.ErrorChan() <- cError
+	}()
+	return true
+}
+
+// 分析。
+func (sche *SchedulerImp) analyze(respParsers []anlz.ParseResponse, resp model.Response) {
+	defer func() {
+		if p := recover(); p != nil {
+			errMsg := fmt.Sprintf("Fatal Analysis Error: %s\n", p)
+			logger.Fatal(errMsg)
+		}
+	}()
+	analyzer, err := sche.alPool.Take()
+	if err != nil {
+		errMsg := fmt.Sprintf("Analyzer pool error: %s", err)
+		sche.sendError(errors.New(errMsg), SCHEDULER_CODE)
+		return
+	}
+	defer func() {
+		err := sche.alPool.Return(analyzer)
+		if err != nil {
+			errMsg := fmt.Sprintf("Analyzer pool error: %s", err)
+			sche.sendError(errors.New(errMsg), SCHEDULER_CODE)
+		}
+	}()
+	code := generateCode(ANALYZER_CODE, analyzer.Id())
+	reqList,item, errs := analyzer.Analyze(resp,respParsers)
+	if reqList!=nil{
+		for _,req:=range reqList{
+			if req.HttpReq()!=nil{
+				sche.saveReqToCache(req,code)
+			}
+		}
+	}
+
+	if item!=nil{
+		sche.sendItem(item,code)
+	}
+
+	if errs != nil {
+		for _, err := range errs {
+			sche.sendError(err, code)
+		}
+	}
+}
+
+func (sche *SchedulerImp) saveReqToCache() {

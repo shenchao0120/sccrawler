@@ -19,7 +19,7 @@ const (
 
 type CrawlerError interface {
 	Type() ErrorType
-	ErrorMsg() string
+	Error() string
 }
 
 type crawlerErrorImp struct {
@@ -35,7 +35,7 @@ func (cei *crawlerErrorImp)Type() ErrorType{
 	return cei.errType
 }
 
-func (cei *crawlerErrorImp)ErrorMsg()string{
+func (cei *crawlerErrorImp)Error()string{
 	if cei.fullErrMsg==""{
 		cei.getFullErrMsg()
 	}
