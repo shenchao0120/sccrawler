@@ -32,7 +32,7 @@ type ChannelManager interface{
 	//获取响应通道
 	GetRepChan()(chan Response,error)
 	//获取数据处理通道
-	GetItemsChan()(chan Items,error)
+	GetItemsChan()(chan *Item,error)
 	//获取错误通道
 	GetErrorChan()(chan error,error)
 	//获取通道管理器状态
@@ -51,7 +51,7 @@ type channelManagerImp struct{
 	channelConfig	*ChannelConfig
 	reqChan		chan Request
 	repChan		chan Response
-	itemsChan	chan Items
+	itemsChan	chan *Item
 	errChan		chan error
 	status 		channelManagerStatus
 	rwMutex 	sync.RWMutex
@@ -71,7 +71,7 @@ func (chanmgr *channelManagerImp)Init(channelConfig *ChannelConfig,reset bool) b
 	chanmgr.channelConfig=channelConfig
 	chanmgr.reqChan=make(chan Request,channelConfig.ReqChanLen())
 	chanmgr.repChan=make(chan Response,channelConfig.RepChanLen())
-	chanmgr.itemsChan=make(chan Items,channelConfig.ItemsChanLen())
+	chanmgr.itemsChan=make(chan *Item,channelConfig.ItemsChanLen())
 	chanmgr.errChan=make(chan error,channelConfig.ErrorChanLen())
 	return true
 }
@@ -120,7 +120,7 @@ func (chanmgr *channelManagerImp)GetRepChan()(chan Response,error){
 	return chanmgr.repChan,nil
 }
 
-func (chanmgr *channelManagerImp)GetItemsChan()(chan Items,error){
+func (chanmgr *channelManagerImp)GetItemsChan()(chan *Item,error){
 	chanmgr.rwMutex.RLock()
 	defer  chanmgr.rwMutex.RUnlock()
 	if err:=chanmgr.checkStatus();err!=nil{

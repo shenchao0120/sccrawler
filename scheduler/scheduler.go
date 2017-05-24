@@ -12,6 +12,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
+	"strings"
 )
 
 const (
@@ -30,7 +31,7 @@ type Scheduler interface {
 	//启动调度器
 	Start(
 		chanCfg model.ChannelConfig,
-		pollCfg model.PoolBaseConfig,
+		poolCfg model.PoolBaseConfig,
 		crawlDepth uint32,
 		httpClientGenerator GenHttpClient,
 		respParsers []anlz.ParseResponse,
@@ -68,7 +69,7 @@ type SchedulerImp struct{
 
 func (sche *SchedulerImp)Start (
 	chanCfg model.ChannelConfig,
-	pollCfg model.PoolBaseConfig,
+	poolCfg model.PoolBaseConfig,
 	crawlDepth uint32,
 	httpClientGenerator GenHttpClient,
 	respParsers []anlz.ParseResponse,
@@ -92,10 +93,10 @@ func (sche *SchedulerImp)Start (
 	}
 	sche.chanCfg=chanCfg
 
-	if err:=pollCfg.Check();err!=nil{
+	if err:=poolCfg.Check();err!=nil{
 		return err
 	}
-	sche.pollCfg=pollCfg
+	sche.pollCfg=poolCfg
 	sche.crawlDepth=crawlDepth
 
 	if firstRequest == nil {
@@ -329,7 +330,7 @@ func (sche *SchedulerImp) analyze(respParsers []anlz.ParseResponse, resp model.R
 	if reqList!=nil{
 		for _,req:=range reqList{
 			if req.HttpReq()!=nil{
-				sche.saveReqToCache(req,code)
+				sche.saveReqToCache(&req,code)
 			}
 		}
 	}
@@ -345,4 +346,126 @@ func (sche *SchedulerImp) analyze(respParsers []anlz.ParseResponse, resp model.R
 	}
 }
 
-func (sche *SchedulerImp) saveReqToCache() {
+func (sche *SchedulerImp) saveReqToCache(req *model.Request, code string )bool {
+	httpReq:=req.HttpReq()
+	if httpReq==nil {
+		logger.Warning("Ignore the request! The HTTP request is invalid!\n")
+		return false
+	}
+	reqURL:=httpReq.URL
+	if reqURL==nil {
+		logger.Warning("Ignore the request! The HTTP request URL is invalid!\n")
+		return false
+	}
+	if strings.ToLower(reqURL.Scheme)[0:4]!="http" {
+		logger.Warning("Ignore the request! Only HTTP or HTTPS is supported !\n")
+		return false
+	}
+	if _,ok:=sche.urlMap[reqURL.String()] ;!ok{
+		logger.Warning("Ignore the request! The HTTP request URL is repeated! !\n")
+		return false
+	}
+	if pd,_:=getPrimaryDomain(httpReq.Host);pd!=sche.primaryDomain {
+		logger.Warning("Ignore the request! The HTTP request primary domain is not accepted !\n")
+		return false
+	}
+	if req.Depth()>sche.crawlDepth{
+		logger.Warning("Ignore the request! The HTTP request is deeper than setting !\n")
+		return false
+
+	}
+	if sche.stopSign.IsSigned() {
+		sche.stopSign.Dealt(code)
+		return false
+	}
+	sche.reqCache.put(req)
+	sche.urlMap[reqURL.String()]=true
+	return true
+}
+
+
+func (sche *SchedulerImp) sendItem (item *model.Item,code string) bool {
+	if sche.stopSign.IsSigned() {
+		sche.stopSign.Dealt(code)
+	}
+	if itemChan,err:=sche.chanman.GetItemsChan();err!=nil{
+		logger.Warningf("Get item chan error:%s !\n",err)
+		return false
+	}else {
+		itemChan <-item
+	}
+	return true
+}
+
+func (sche *SchedulerImp)sendResp(response *model.Response,code string)bool{
+	if sche.stopSign.IsSigned() {
+		sche.stopSign.Dealt(code)
+	}
+	if repChan,err:=sche.chanman.GetRepChan();err!=nil{
+		logger.Warningf("Get response chan error:%s !\n",err)
+		return false
+	}else {
+		repChan <- *response
+	}
+	return true
+}
+
+func (sche *SchedulerImp) openItemPipeline() {
+	go func(){
+		code:=SCHEDULER_CODE
+		sche.itemPipe.SetFailFast(true)
+		itemChan,err:=sche.chanman.GetItemsChan()
+		if err!=nil {
+			logger.Warningf("Get item chan error:%s !\n",err)
+			panic(err)
+
+		}
+		for item:= range itemChan{
+			go func(item *model.Item) {
+				defer func() {
+					if p:=recover();p!=nil{
+						errMsg:=fmt.Sprintf("Fatal Item Processing Error: %s\n", p)
+						logger.Fatal(errMsg)
+					}
+				}()
+				errs:=sche.itemPipe.Send(item)
+				for _,err:= range errs{
+					sche.sendError(err,code)
+				}
+			}(item)
+		}
+	}()
+}
+
+
+func (sche *SchedulerImp)schedule (interval time.Duration){
+	go func(){
+		if interval<1 * time.Millisecond{
+			interval=1*time.Millisecond
+		}
+		for {
+			if sche.stopSign.IsSigned(){
+				sche.stopSign.Dealt(SCHEDULER_CODE)
+				return
+			}
+			if reqChan,err:=sche.chanman.GetReqChan();err!=nil{
+				logger.Warningf("Get request chan error:%s !\n",err)
+				return
+			}else {
+
+				for remainder:=cap(reqChan)-len(reqChan);remainder>0;remainder--{
+					if sche.stopSign.IsSigned(){
+						sche.stopSign.Dealt(SCHEDULER_CODE)
+						return
+					}
+					temp:=sche.reqCache.get()
+					if temp==nil{
+						break
+					}
+					reqChan<-*temp
+				}
+			}
+			time.Sleep(interval)
+		}
+	}()
+}
