@@ -2,15 +2,15 @@ package analyzer
 
 import (
 	"github.com/op/go-logging"
-	mdw "chaoshen.com/sccrawler/middleware"
 	"chaoshen.com/sccrawler/model"
 	"errors"
 	"fmt"
+	"chaoshen.com/sccrawler/otherTools"
 )
 
 var logger= logging.MustGetLogger("analyzer")
 
-var idGenerator mdw.IdGenerator=mdw.NewIdGenerator()
+var idGenerator otherTools.IdGenerator=otherTools.NewIdGenerator()
 
 func genAnalyzerId()uint32{
 	return idGenerator.GetUint32()
@@ -44,7 +44,7 @@ func (ali *analyzerImp)Analyze(resp model.Response,parsers []ParseResponse)([]mo
 		err:=errors.New("Response parsers is nil!")
 		return nil,nil,[]error{err}
 	}
-	logger.Debugf("Parse the response URL=%s,depth=%d",resp.HttpRep().Request.URL,resp.Depth())
+	logger.Debugf("Parse the response URL=%s,depth=%d,parses=%v",resp.HttpRep().Request.URL,resp.Depth(),parsers)
 	requestList:=make([]model.Request,0)
 	errorList:=make([]error,0)
 	item:=model.NewItem(resp)

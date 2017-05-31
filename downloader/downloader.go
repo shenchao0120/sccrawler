@@ -1,17 +1,17 @@
 package downloader
 
 import (
-	mdw "chaoshen.com/sccrawler/middleware"
 	"github.com/op/go-logging"
 	"chaoshen.com/sccrawler/model"
 	"net/http"
 	"errors"
+	"chaoshen.com/sccrawler/otherTools"
 )
 
 var logger= logging.MustGetLogger("Downloader")
 
 
-var idGenerator mdw.IdGenerator=mdw.NewIdGenerator()
+var idGenerator otherTools.IdGenerator=otherTools.NewIdGenerator()
 
 func genDownloaderID()uint32{
 	return idGenerator.GetUint32()

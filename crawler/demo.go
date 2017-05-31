@@ -1,4 +1,4 @@
-package crawler
+package main
 
 import (
 	"github.com/op/go-logging"
@@ -14,6 +14,7 @@ import (
 	"chaoshen.com/sccrawler/analyzer"
 	"chaoshen.com/sccrawler/itempipeline"
 	"chaoshen.com/sccrawler/scheduler"
+	"chaoshen.com/sccrawler/tools"
 )
 
 var logger=logging.MustGetLogger("Demo Main")
@@ -27,9 +28,10 @@ func ItemProcessor(pItem *model.Item)(*model.Item, error){
 }
 
 func parseForATag(response model.Response)([]model.Request,model.ItemData,[]error){
-	if response.HttpRep().Status!="200"{
+	if response.HttpRep().StatusCode!=200{
+		logger.Warningf("Unsupported status code %d. (httpResponse=%v)",response.HttpRep().StatusCode, response.HttpRep())
 		err := errors.New(
-			fmt.Sprintf("Unsupported status code %d. (httpResponse=%v)", response.HttpRep()))
+			fmt.Sprintf("Unsupported status code %d. (httpResponse=%v)",response.HttpRep().StatusCode, response.HttpRep()))
 		return nil, nil,[]error{err}
 	}
 	var reqUrl *url.URL=response.HttpRep().Request.URL
@@ -68,8 +70,8 @@ func parseForATag(response model.Response)([]model.Request,model.ItemData,[]erro
 			if err!=nil{
 				errs=append(errs,err)
 			}else{
-				newReq:=model.Request{httpReq,response.Depth()}
-				newRequest=append(newRequest,newReq)
+				newReq:=model.NewRequest(httpReq,response.Depth())
+				newRequest=append(newRequest,*newReq)
 			}
 		}
 		text:=strings.TrimSpace(sel.Text())
@@ -102,9 +104,32 @@ func genHttpClient() *http.Client {
 	return &http.Client{}
 }
 
+func record(level byte, content string) {
+	if content == "" {
+		return
+	}
+	switch level {
+	case 0:
+		logger.Info(content)
+	case 1:
+		logger.Warning(content)
+	case 2:
+		logger.Info(content)
+	}
+}
+
 func main(){
+	logger.Debug("Start the crawler...")
 	sched:=scheduler.NewScheduler()
-	//interval:=10*time.Millisecond
+	intervalNs:=10*time.Millisecond
+	maxIdleCount := uint(1000)
+	checkCountChan := tools.Monitoring(
+		sched,
+		intervalNs,
+		maxIdleCount,
+		true,
+		false,
+		record)
 	chancfg:=model.NewChannelConfig(10,10,10,10)
 	poolCfg:=model.NewPoolBaseConfig(3,3)
 	crawlDepth := uint32(1)
@@ -120,6 +145,6 @@ func main(){
 	sched.Start(*chancfg,*poolCfg,crawlDepth,httpClientGenerator,respParsers,itemProcessors,firstHttpReq)
 
 
-
+	<-checkCountChan
 }
 

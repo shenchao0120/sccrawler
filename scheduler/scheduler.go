@@ -44,6 +44,8 @@ type Scheduler interface {
 	Running() bool
 	//错误通道
 	ErrorChan() <-chan error
+	// 判断所有处理模块是否都处于空闲状态。
+	Idle() bool
 	//Summary(prefix string) SchedSummary
 }
 
@@ -181,9 +183,12 @@ func (sche* SchedulerImp) Running()bool{
 }
 
 func (sche* SchedulerImp)ErrorChan() <-chan error {
+	fmt.Println("ErrorChan begin")
 	if sche.chanman.Status()!=mid.CHANNEL_MANAGER_STATUS_INITIALIZED{
 		return nil
 	}
+	fmt.Println("ErrorChan end")
+
 	if errChan,err:=sche.chanman.GetErrorChan();err!=nil{
 		panic(err)
 	}else{
@@ -299,7 +304,11 @@ func (sche *SchedulerImp) sendError(err error, code string) bool {
 		return false
 	}
 	go func() {
-		sche.ErrorChan() <- cError
+		if errChan,err:=sche.chanman.GetErrorChan();err!=nil{
+			panic(err)
+		}else {
+			errChan <- cError
+		}
 	}()
 	return true
 }

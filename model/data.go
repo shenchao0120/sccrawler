@@ -3,8 +3,8 @@ package model
 import (
 	"net/http"
 	"net/url"
-	"chaoshen.com/sccrawler/middleware"
 	"time"
+	"chaoshen.com/sccrawler/otherTools"
 )
 
 //基础数据接口
@@ -76,7 +76,7 @@ type Item struct {
 
 func NewItem(req Response ) *Item {
 	id :=genItemID()
-	timestamp:=([]byte)time.Now().String()
+	timestamp:=[]byte(time.Now().String())
 	dataMap:=make(ItemData)
 	return &Item{id:id,
 		url:req.httpRep.Request.URL,
@@ -128,7 +128,7 @@ func (item * Item)DataMap() ItemData{
 type ItemData map[string]interface{}
 
 
-var idGenerator middleware.IdGenerator=middleware.NewIdGenerator()
+var idGenerator otherTools.IdGenerator=otherTools.NewIdGenerator()
 
 func genItemID()uint32{
 	return idGenerator.GetUint32()
