@@ -65,7 +65,7 @@ type SchedulerImp struct{
 	itemPipe ipl.ItemPipeline
 	reqCache requestCache
 	urlMap  map[string]bool
-	running uint32 // 运行标记。0表示未运行，1表示已运行，2表示已停止
+	running uint32 // 运行标记。0表示未运行，1表示已运行，2表示已停止 3表示正在启动
 }
 
 
@@ -89,7 +89,10 @@ func (sche *SchedulerImp)Start (
 	if atomic.LoadUint32(&sche.running)==1{
 		return errors.New("The scheduler has been started!\n")
 	}
-	atomic.StoreUint32(&sche.running,1)
+	if atomic.LoadUint32(&sche.running)==3{
+		return errors.New("The scheduler is being started!\n")
+	}
+	atomic.StoreUint32(&sche.running,3)
 	if err:=chanCfg.Check();err!=nil{
 		return err
 	}
@@ -155,10 +158,17 @@ func (sche *SchedulerImp)Start (
 
 	sche.urlMap=make(map[string]bool)
 
+	atomic.StoreUint32(&sche.running,1)
+	if err:=chanCfg.Check();err!=nil{
+		return err
+	}
+
 	sche.startDownloading()
 	sche.activateAnalyzers(respParsers)
 	sche.openItemPipeline()
 	sche.schedule(10 * time.Millisecond)
+
+
 
 	firstReq:=model.NewRequest(firstRequest,0)
 	sche.reqCache.put(firstReq)

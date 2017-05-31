@@ -144,7 +144,6 @@ func main(){
 	}
 	sched.Start(*chancfg,*poolCfg,crawlDepth,httpClientGenerator,respParsers,itemProcessors,firstHttpReq)
 
-
 	<-checkCountChan
 }
 
