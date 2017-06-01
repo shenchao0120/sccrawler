@@ -4,6 +4,7 @@ import (
 	"sync"
 	"fmt"
 	"chaoshen.com/sccrawler/model"
+	//"bytes"
 )
 
 // 状态字典。
@@ -50,9 +51,11 @@ func (rcache *reqCacheBySlice) put(req *model.Request) bool {
 	if rcache.status == 1 {
 		return false
 	}
+
 	rcache.mutex.Lock()
 	defer rcache.mutex.Unlock()
 	rcache.cache = append(rcache.cache, req)
+
 	return true
 }
 
@@ -86,12 +89,27 @@ func (rcache *reqCacheBySlice) close() {
 }
 
 // 摘要信息模板。
-var summaryTemplate = "status: %s, " + "length: %d, " + "capacity: %d"
+var summaryTemplate = "status: %s, " + "length: %d, " + "capacity: %d,"+"url：%s"
 
 func (rcache *reqCacheBySlice) summary() string {
+	/*
+	var buffer bytes.Buffer
+	urlCount:=len(rcache.cache)
+	buffer.WriteByte('\n')
+	if urlCount>0{
+		for _,v:=range rcache.cache{
+			buffer.WriteString("cachesummaryurl")
+			buffer.WriteString(v.HttpReq().URL.String())
+			buffer.WriteByte('\n')
+		}
+	}
+	tmpStr:=buffer.String()
+	*/
+	tmpStr:=""
 	summary := fmt.Sprintf(summaryTemplate,
 		statusMap[rcache.status],
 		rcache.length(),
-		rcache.capacity())
+		rcache.capacity(),
+		tmpStr )
 	return summary
 }

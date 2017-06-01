@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 	"strings"
+	"sync"
 )
 
 const (
@@ -47,6 +48,7 @@ type Scheduler interface {
 	// 判断所有处理模块是否都处于空闲状态。
 	Idle() bool
 	//Summary(prefix string) SchedSummary
+	Summary(prefix string) SchedSummary
 }
 
 func NewScheduler()Scheduler {
@@ -66,6 +68,7 @@ type SchedulerImp struct{
 	reqCache requestCache
 	urlMap  map[string]bool
 	running uint32 // 运行标记。0表示未运行，1表示已运行，2表示已停止 3表示正在启动
+	urlMapMutex sync.RWMutex
 }
 
 
@@ -172,6 +175,7 @@ func (sche *SchedulerImp)Start (
 
 	firstReq:=model.NewRequest(firstRequest,0)
 	sche.reqCache.put(firstReq)
+	sche.urlMap[firstRequest.URL.String()]=true
 
 	return nil
 }
@@ -349,7 +353,7 @@ func (sche *SchedulerImp) analyze(respParsers []anlz.ParseResponse, resp model.R
 	if reqList!=nil{
 		for _,req:=range reqList{
 			if req.HttpReq()!=nil{
-				sche.saveReqToCache(&req,code)
+				sche.saveReqToCache(req,code)
 			}
 		}
 	}
@@ -376,14 +380,17 @@ func (sche *SchedulerImp) saveReqToCache(req *model.Request, code string )bool {
 		logger.Warning("Ignore the request! The HTTP request URL is invalid!\n")
 		return false
 	}
-	if strings.ToLower(reqURL.Scheme)[0:4]!="http" {
+	if strings.ToLower(reqURL.Scheme)!="http" {
 		logger.Warning("Ignore the request! Only HTTP or HTTPS is supported !\n")
 		return false
 	}
-	if _,ok:=sche.urlMap[reqURL.String()] ;!ok{
+	sche.urlMapMutex.Lock()
+	defer sche.urlMapMutex.Unlock()
+	if _,ok:=sche.urlMap[reqURL.String()] ;ok{
 		logger.Warning("Ignore the request! The HTTP request URL is repeated! !\n")
 		return false
 	}
+
 	if pd,_:=getPrimaryDomain(httpReq.Host);pd!=sche.primaryDomain {
 		logger.Warning("Ignore the request! The HTTP request primary domain is not accepted !\n")
 		return false
@@ -487,4 +494,8 @@ func (sche *SchedulerImp)schedule (interval time.Duration){
 			time.Sleep(interval)
 		}
 	}()
+}
+
+func (sche *SchedulerImp)Summary(prefix string)SchedSummary{
+	return NewSchedSummary(sche,prefix)
 }

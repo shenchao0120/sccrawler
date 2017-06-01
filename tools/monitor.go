@@ -179,6 +179,8 @@ func recordSummary(
 		waitForSchedulerStart(scheduler)
 		// 准备
 		var recordCount uint64 = 1
+		var prevSchedSummary sched.SchedSummary
+		var prevNumGoroutine int
 		startTime := time.Now()
 		for {
 			// 查看监控停止通知器
@@ -189,17 +191,28 @@ func recordSummary(
 			}
 			// 获取摘要信息的各组成部分
 			currNumGoroutine := runtime.NumGoroutine()
-
+			currSchedSummary:=scheduler.Summary("	")
+			if currNumGoroutine!=prevNumGoroutine || !currSchedSummary.Same(prevSchedSummary){
+				schedSummaryStr:=func() string{
+					if detailSummary{
+						return currSchedSummary.Detail()
+					}else {
+						return currSchedSummary.String()
+					}
+				}()
 				// 记录摘要信息
 				info := fmt.Sprintf(summaryForMonitoring,
 					recordCount,
 					currNumGoroutine,
-					"",
+					schedSummaryStr,
 					time.Since(startTime).String(),
 				)
 				record(0, info)
+				prevNumGoroutine=currNumGoroutine
+				prevSchedSummary=currSchedSummary
 				recordCount++
-			time.Sleep(time.Microsecond)
+			}
+			time.Sleep(100*time.Microsecond)
 		}
 	}()
 }

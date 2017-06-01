@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"errors"
 	"chaoshen.com/sccrawler/otherTools"
+	"time"
 )
 
 var logger= logging.MustGetLogger("Downloader")
@@ -48,6 +49,7 @@ func (pdi *pageDownloaderImp)Download(request model.Request)(*model.Response,err
 		return nil,errors.New("Invaild Request!")
 	}
 	logger.Debugf("Begin http request with url:%s\n",request.HttpReq().URL.String())
+	pdi.httpClient.Timeout=3 *time.Second
 	if httpRep,err:=pdi.httpClient.Do(request.HttpReq());err!=nil{
 		return nil,err
 	} else {

@@ -19,7 +19,7 @@ func genAnalyzerId()uint32{
 
 type Analyzer interface {
 	Id() uint32
-	Analyze(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error)
+	Analyze(resp model.Response,parsers []ParseResponse)([] *model.Request,* model.Item,[]error)
 }
 
 type analyzerImp struct {
@@ -35,7 +35,7 @@ func (ali *analyzerImp)Id()uint32{
 	return ali.id
 }
 
-func (ali *analyzerImp)Analyze(resp model.Response,parsers []ParseResponse)([]model.Request,* model.Item,[]error){
+func (ali *analyzerImp)Analyze(resp model.Response,parsers []ParseResponse)([] *model.Request,* model.Item,[]error){
 	if resp.Valid()==false{
 		err:=errors.New("Response invalid!")
 		return nil,nil,[]error{err}
@@ -45,7 +45,7 @@ func (ali *analyzerImp)Analyze(resp model.Response,parsers []ParseResponse)([]mo
 		return nil,nil,[]error{err}
 	}
 	logger.Debugf("Parse the response URL=%s,depth=%d,parses=%v",resp.HttpRep().Request.URL,resp.Depth(),parsers)
-	requestList:=make([]model.Request,0)
+	requestList:=make([]*model.Request,0)
 	errorList:=make([]error,0)
 	item:=model.NewItem(resp)
 
@@ -76,7 +76,7 @@ func appendErrorList(errorList []error,errList2 []error) []error{
 	return errorList
 }
 
-func appendRequestList(resultList[]model.Request,partList []model.Request) []model.Request{
+func appendRequestList(resultList[]*model.Request,partList []*model.Request) []*model.Request{
 	for i,elem:=range partList{
 		if !elem.Valid(){
 			logger.Debugf("Invaild element %d",i)

@@ -27,7 +27,7 @@ func ItemProcessor(pItem *model.Item)(*model.Item, error){
 	return pItem, nil
 }
 
-func parseForATag(response model.Response)([]model.Request,model.ItemData,[]error){
+func parseForATag(response model.Response)([]*model.Request,model.ItemData,[]error){
 	if response.HttpRep().StatusCode!=200{
 		logger.Warningf("Unsupported status code %d. (httpResponse=%v)",response.HttpRep().StatusCode, response.HttpRep())
 		err := errors.New(
@@ -41,7 +41,7 @@ func parseForATag(response model.Response)([]model.Request,model.ItemData,[]erro
 			httpRespBody.Close()
 		}
 	}()
-	newRequest:=make([]model.Request,0)
+	newRequest:=make([]*model.Request,0)
 	itemData:=make(map[string]interface{})
 	errs:=make([]error,0)
 
@@ -71,7 +71,7 @@ func parseForATag(response model.Response)([]model.Request,model.ItemData,[]erro
 				errs=append(errs,err)
 			}else{
 				newReq:=model.NewRequest(httpReq,response.Depth())
-				newRequest=append(newRequest,*newReq)
+				newRequest=append(newRequest,newReq)
 			}
 		}
 		text:=strings.TrimSpace(sel.Text())
@@ -128,10 +128,10 @@ func main(){
 		intervalNs,
 		maxIdleCount,
 		true,
-		false,
+		true,
 		record)
 	chancfg:=model.NewChannelConfig(10,10,10,10)
-	poolCfg:=model.NewPoolBaseConfig(3,3)
+	poolCfg:=model.NewPoolBaseConfig(2,3)
 	crawlDepth := uint32(1)
 	httpClientGenerator := genHttpClient
 	respParsers := getResponseParsers()
